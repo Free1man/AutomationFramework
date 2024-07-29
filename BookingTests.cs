@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
 using IntegrationTests.Models;
+using System.Collections.Generic;
 
 namespace IntegrationTests
 {
@@ -35,13 +36,13 @@ namespace IntegrationTests
         }
 
         [Test]
-        public async Task CreateMerchantAndBookMeeting()
+        public async Task CreateMerchantAndBookMeetingWithNotification()
         {
             // Step 1: Create a new merchant and get credentials via HTTP request
             var merchantData = new { name = "Test Merchant", email = "test@merchant.com" };
             var response = await _client.PostAsJsonAsync($"{_apiBaseUrl}/api/merchants", merchantData);
             response.EnsureSuccessStatusCode();
-        
+
             var credentials = await response.Content.ReadFromJsonAsync<MerchantCredentials>();
             Assert.IsNotNull(credentials, "Failed to retrieve merchant credentials");
 
@@ -63,6 +64,17 @@ namespace IntegrationTests
             // Verify appointment is displayed in the calendar
             Assert.IsTrue(bookingPage.IsAppointmentDisplayed("Example appointment"));
             Assert.AreEqual("Appointment saved!", newAppointmentForm.GetConfirmationMessage());
+
+            // Assuming you have an API to check the last email sent to a user
+            var emailResponse = await _client.GetAsync($"{_apiBaseUrl}/api/notifications/last?email={credentials.Email}");
+            emailResponse.EnsureSuccessStatusCode();
+            var notification = await emailResponse.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+
+            Assert.IsNotNull(notification, "No email notification was found");
+            Assert.IsTrue(notification.ContainsKey("Subject") && notification["Subject"].ToString().Contains("New Appointment"), "Email subject is incorrect");
+            Assert.IsTrue(notification.ContainsKey("Content") && notification["Content"].ToString().Contains("Example appointment"), "Email content does not match expected");
+            Assert.IsTrue(notification.ContainsKey("Date") && notification["Content"].ToString().Contains("2024-07-30"), "Date is is incorrect");
+
         }
 
         [TearDown]
